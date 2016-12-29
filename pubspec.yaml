@@ -8,7 +8,6 @@ dependencies:
   browser: any
   dart_to_js_script_rewriter: any
   js: any
-  ace: any
   jsonx: any
   markdown: any
   fff: any

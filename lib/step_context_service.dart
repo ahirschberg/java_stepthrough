@@ -9,19 +9,20 @@ import 'package:observable/observable.dart';
 class StepContextService extends Injectable {
   LessonIO _lessonIO;
   StepContextService(LessonIO this._lessonIO);
-  StreamController<PropertyChangeRecord<int>> _stepChangeController =
-      new StreamController<PropertyChangeRecord<int>>.broadcast();
-  Stream<PropertyChangeRecord<int>> get onStepChange =>
+  StreamController<PropertyChangeRecord<Step>> _stepChangeController =
+      new StreamController<PropertyChangeRecord<Step>>.broadcast();
+  Stream<PropertyChangeRecord<Step>> get onStepChange =>
       _stepChangeController.stream;
 
-  Future selectLesson(lesson_name, [initial_step_index]) {
+  // FIXME invert dependency to lessonIO
+  Future selectLesson(lesson_name, [initial_step_index=0]) {
     print(lesson_name);
     return _lessonIO.smartLoadData(lesson_name).then((Lesson lesson) {
       if (lesson == null) {
         print("Error: could not load lesson data");
       }
+      stepIndex = initial_step_index;
       currentLesson = lesson;
-      stepIndex = initial_step_index ?? 0;
     });
   }
 
@@ -29,8 +30,8 @@ class StepContextService extends Injectable {
   int _stepIndex = 0;
 
   dynamic _onChangeStepIndex(newValue) {
-    _stepChangeController
-        .add(new PropertyChangeRecord(this, #stepIndex, _stepIndex, newValue));
+    _stepChangeController.add(new PropertyChangeRecord(this, #step,
+        currentLesson.getStep(_stepIndex), currentLesson.getStep(newValue)));
     return newValue;
   }
 
@@ -53,9 +54,6 @@ class StepContextService extends Injectable {
    */
   set stepIndex(new_stepIndex) {
     if (new_stepIndex is String) new_stepIndex = int.parse(new_stepIndex);
-    if (new_stepIndex < 0 || new_stepIndex > currentLesson.length) {
-      print('WARN: Index $new_stepIndex out of bounds.');
-    }
     _stepIndex = _onChangeStepIndex(new_stepIndex);
   }
 

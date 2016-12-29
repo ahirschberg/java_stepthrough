@@ -1,9 +1,8 @@
 import 'dart:async';
 import 'dart:html';
 import 'package:angular2/core.dart';
-import 'package:ace/ace.dart' as ace;
-import 'package:ace/proxy.dart';
 import 'package:angular2/router.dart';
+import 'package:code_steps/action/lesson.dart';
 import 'package:code_steps/action/step.dart';
 import 'package:code_steps/editor/ace_editor_component.dart';
 import 'package:code_steps/editor/action_region_editor_component.dart';
@@ -11,7 +10,9 @@ import 'package:code_steps/editor/lesson_code_editor_component.dart';
 import 'package:code_steps/lesson_io.dart';
 import 'package:code_steps/viewer/code_guide_component.dart';
 import 'package:code_steps/step_context_service.dart';
+import 'package:js/js.dart';
 import 'package:observable/observable.dart';
+import 'ace_facade.dart';
 
 @Component(
     selector: 'lesson-editor',
@@ -29,10 +30,14 @@ class LessonEditorComponent implements OnInit {
   StepContextService stepContextService;
   AceEditorComponent markdownEditor;
   LessonCodeEditorComponent codeEditor;
-  StreamController editorInitStreamController =
+  StreamController _editorInitStreamController =
       new StreamController.broadcast();
-  List<Step> steps = [];
-  Step get currentStep => steps[stepContextService.stepIndex];
+
+  StreamController<PropertyChangeRecord<AceRegionBundle>>
+      activeRegionChangeController =
+      new StreamController<PropertyChangeRecord<AceRegionBundle>>.broadcast();
+  Stream<PropertyChangeRecord<AceRegionBundle>> activeRegionOnChange;
+
   String lessonName;
   LessonIO _lessonIO;
   RouteParams _routeParams;
@@ -42,73 +47,72 @@ class LessonEditorComponent implements OnInit {
 
   @override
   ngOnInit() {
-    ace.implementation = ACE_PROXY_IMPLEMENTATION;
-    editorInitStreamController.stream.listen(_onEditorReady);
-    editorInitStreamController.stream.take(2).drain().then(_onAllEditorsReady);
+    _editorInitStreamController.stream.listen(_onEditorReady);
+    _editorInitStreamController.stream.take(2).drain().then(_onAllEditorsReady);
 
     stepContextService.onStepChange.listen(_onStepChange);
+    activeRegionOnChange = activeRegionChangeController.stream;
   }
 
-  void _onEditorReady(ace.Editor aceController) {
-    aceController.theme = new ace.Theme.named(ace.Theme.SOLARIZED_DARK);
-    aceController.keyboardHandler =
-    new ace.KeyboardHandler.named(ace.KeyboardHandler.VIM);
-    _isVim = true;
+  loadStepToEditors(Step step) {
+    markdownEditor.text = step.explanation;
+    codeEditor.text = step.code;
+    codeEditor.regions = step.regions;
+  }
+  flushEditorsToStep(Step step) {
+    step
+     ..explanation = markdownEditor.text
+     ..code = codeEditor.text
+     ..regions = codeEditor.regions;
+  }
+
+  // TODO
+  void _onEditorReady(Editor aceController) {
+//    aceController.theme = new ace.Theme.named(ace.Theme.SOLARIZED_DARK);
+//    aceController.keyboardHandler =
+//    new ace.KeyboardHandler.named(ace.KeyboardHandler.VIM);
+//    _isVim = true;
   }
 
   void _onAllEditorsReady(_) {
-    codeEditor.aceController.onChange.listen((ace.Delta d) => print(d.text));
-
-    markdownEditor.aceController.renderer.showGutter = false;
-    markdownEditor.aceController.session.useWrapMode = true;
-
+//    codeEditor.aceController.on("change", allowInterop((b, c) {
+//      print('code pane change event:');
+//      window.console.log(b);
+//    }));
+    markdownEditor.aceController.renderer.setShowGutter(false);
+    markdownEditor.aceController.session.setUseWrapMode(true);
     lessonName = _routeParams.get('lesson_name');
     if (lessonName != null) serializedRetrieve();
   }
 
-  void _onStepChange(PropertyChangeRecord data) {
-    markdownEditor.aceController.setValue(steps[data.newValue].explanation);
+  void _onStepChange(PropertyChangeRecord<Step> data) {
+    flushEditorsToStep(data.oldValue);
+    loadStepToEditors(data.newValue);
   }
 
-  void reset() {
-    steps = [];
-    codeEditor.cleanRegions();
-  }
-
-  Iterable getSavedLessons() {
-    return window.localStorage.keys
-        .where((k) => k.startsWith('lesson-'))
-        .map((k) => [k, window.localStorage[k]]);
-  }
-
-  // FIXME
-  void initFromMap(Map serializedEditData) {
-    reset();
-    codeEditor.aceController.setValue(serializedEditData['code']);
-    steps = serializedEditData['steps'].map((Map jsonStep) => Step.deserialize(jsonStep));
-    markdownEditor.aceController
-        .setValue(currentStep.explanation);
-//    codeEditor.addSerializedRegions(serializedEditData['regions']);
-    codeEditorFilepath = serializedEditData['meta']['code_filename'];
+  void serializedInit(Lesson lesson) {
+    stepContextService.currentLesson = lesson;
+    codeEditorFilepath = "TODO"; // FIXME
+    loadStepToEditors(stepContextService.currentStep);
   }
 
   setupMarkdownEditor(AceEditorComponent editor) {
-    editor.aceController.session.mode = new ace.Mode.named(ace.Mode.MARKDOWN);
+    editor.aceController.session.setMode('ace/mode/markdown'); // FIXME?
     markdownEditor = editor;
-    editorInitStreamController.add(editor.aceController);
+    _editorInitStreamController.add(editor.aceController);
   }
 
   setupCodeEditor(LessonCodeEditorComponent code_editor) {
     codeEditor = code_editor;
-    editorInitStreamController.add(codeEditor.aceController);
+    _editorInitStreamController.add(codeEditor.aceController);
   }
 
   bool _isVim = false;
   bool get vimModeEnabled => _isVim;
   set vimModeEnabled(value) {
     _isVim = value;
-    ace.KeyboardHandler mode = new ace.KeyboardHandler.named(value ? ace.KeyboardHandler.VIM : ace.KeyboardHandler.DEFAULT);
-    [codeEditor, markdownEditor].forEach((AceEditorComponent e) => e.aceController.keyboardHandler = mode);
+//    ace.KeyboardHandler mode = new ace.KeyboardHandler.named(value ? ace.KeyboardHandler.VIM : ace.KeyboardHandler.DEFAULT);
+//    [codeEditor, markdownEditor].forEach((AceEditorComponent e) => e.aceController.keyboardHandler = mode);
   }
 
   String _codeEditorFilepath;
@@ -119,25 +123,23 @@ class LessonEditorComponent implements OnInit {
   }
 
   _updateCodeEditorFiletype(String filepath) {
-    codeEditor.aceController.session.mode = new ace.Mode.forFile(filepath);
+    codeEditor.aceController.session.setMode('javascript'); // FIXME
   }
 
   serializedSave() {
-    steps[stepContextService.stepIndex].explanation = markdownEditor.aceController.value;
+    flushEditorsToStep(stepContextService.currentStep);
     if (lessonName == null || lessonName.length == 0) {
       print('Cannot save an empty lesson name!');
     } else {
-      _lessonIO.saveLesson(lessonName, this);
+      _lessonIO.saveLesson(lessonName, stepContextService.currentLesson);
     }
   }
 
-  serializedRetrieve() => _lessonIO
-      .smartLoadData(lessonName)
-      .then((decoded) => initFromMap(decoded));
+  serializedRetrieve() =>
+      _lessonIO.smartLoadData(lessonName).then(serializedInit);
 
-  Map toJson() => {
-        'code': codeEditor.aceController.value,
-        'steps': steps,
-        'meta': {'code_filename': _codeEditorFilepath}
-      };
+  toJson() {
+    print('calling toJson');
+    throw 'Lesson editor is not serializable'; // FIXME
+  }
 }

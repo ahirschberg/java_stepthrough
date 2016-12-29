@@ -1,6 +1,6 @@
 import 'package:angular2/core.dart';
-import 'package:ace/ace.dart' as ace;
 import 'package:code_steps/action/step_action.dart';
+import 'package:code_steps/editor/ace_facade.dart';
 import 'package:code_steps/lesson_serializer.dart';
 
 @Injectable()
@@ -11,8 +11,8 @@ class StepActionsProvider extends Injectable {
     transformers = new Map.fromIterable(StepActionType.values,
         value: (t) => _generateTagWrap(t));
 
-    transformers[StepActionType.Pass](
-        [new RegionInsert([])], new ace.Range(0, 0, 0, 0));
+    // transformers[StepActionType.Pass](
+    //     [new RegionInsert([])], new Range(0, 0, 0, 0));
 
     // override default tag actions for certain types
     transformers.addAll({
@@ -20,7 +20,7 @@ class StepActionsProvider extends Injectable {
     });
   }
 
-  static final Function _hide = (List<RegionInsert> lines, ace.Range range) {
+  static final Function _hide = (List<RegionInsert> lines, AceRange range) {
     RegionInsert startLine = lines[range.start.row];
     if (range.start.row == range.end.row) {
       startLine.delete(range.start.column, range.end.column);
@@ -39,8 +39,8 @@ class StepActionsProvider extends Injectable {
     String typeString = LessonSerializer.stepActionTypeHelper.stringFromEnum(t);
     String openTag = '<cs-region class="action-${typeString.toLowerCase()}">';
     String closeTag = '</cs-region>';
-    return (List<RegionInsert> lines, ace.Range range) {
-      if (range.isEmpty) {
+    return (List<RegionInsert> lines, AceRange range) {
+      if (range.isEmpty()) {
         print('WARN: empty range $range');
         return;
       }

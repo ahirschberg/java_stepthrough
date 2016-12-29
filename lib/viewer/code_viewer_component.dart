@@ -26,7 +26,7 @@ class CodeViewerComponent implements OnInit {
   ngOnInit() {
     stepContextService.onStepChange.listen((PropertyChangeRecord change) =>
         _addCodeHtml(_addHtmlRegions(stepContextService.currentStep.code,
-            stepContextService.currentStep.activeRegions, stepContextService.stepIndex)));
+            stepContextService.currentStep.regions, stepContextService.stepIndex)));
   }
 
   _addCodeHtml(String codeHtml) {

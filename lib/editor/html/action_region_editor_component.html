@@ -1,20 +1,15 @@
 <h3>Action Region Editor</h3>
-<div class="row" *ngIf="region != null">
+<p> activeRegion: {{ activeRegion }}</p>
+<div class="row" *ngIf="activeRegion != null">
     <div class="col-md-3">
-        <bs-button-group class="step-actions-picker btn-group-vertical">
-            <bs-radio-button *ngFor="let action of actionUIToggles.keys"
-                             class="btn btn-sm btn-info" style="width: 100%;"
-                             [(ngModel)]="selectedActionType" [option]="action">
+        <ul class="step-actions-picker btn-group-vertical">
+            <li *ngFor="let action of regionActions"
+                             class="btn btn-sm btn-info" style="width: 100%;" >
                 {{esh.stringFromEnum(action)}}
-            </bs-radio-button>
-        </bs-button-group>
+            </li>
+        </ul>
     </div>
     <div class="col-md-6">
-        <select class="steps-picker form-control" multiple>
-            <option [selected]="region.stepData.keys.contains(0)" *ngFor="let stepDescription of stepDescriptions">
-                {{stepDescription}}
-            </option>
-        </select>
         <button (click)="deleteRegion()">Delete Region</button>
     </div>
 </div>
